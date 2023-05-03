@@ -56,14 +56,18 @@ int main() {
     int dist[N][N];
     init(&dist[0][0], N);
 
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
+   float elapsedTime = 0.0f;
+    cudaError_t cudaEventErr = cudaEventElapsedTime(&elapsedTime, start, stop);
+    if (cudaEventErr != cudaSuccess) {
+        fprintf(stderr, "Failed to calculate elapsed time: %s\n", cudaGetErrorString(cudaEventErr));
+        return -1;}
+    elapsedTime *= 1000.0f;
 
     floyd_warshall_cuda(&dist[0][0], N);
-
-    gettimeofday(&end_time, NULL);
-    long long elapsed_time = (end_time.tv_sec - start_time.tv_sec) * 1000000LL + (end_time.tv_usec - start_time.tv_usec);
-    printf("Elapsed time: %lld microseconds\n", elapsed_time);
+    
+    printf("total time (ms) : %f \n", elapsedTime);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     return 0;
 }
