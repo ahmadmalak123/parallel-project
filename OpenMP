@@ -2,49 +2,60 @@
 #include <stdlib.h>
 #include <omp.h>
 
-#define N 750
 #define INF 1000000000
 
-void floyd_warshall_openmp(int *dist, int n) {
-    int k, i, j;
-    #pragma omp parallel for shared(dist) private(k, i, j) schedule(dynamic)
-    for (k = 0; k < n; k++) {
-        #pragma omp parallel for shared(dist, k) private(i, j) schedule(dynamic)
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                if (dist[i * n + k] + dist[k * n + j] < dist[i * n + j]) {
-                    dist[i * n + j] = dist[i * n + k] + dist[k * n + j];
+void floyd_warshall(int **dist, int n) {
+    int i, j, k;
+
+    #pragma omp parallel shared(dist) private(k, i, j)
+    {
+        for (k = 0; k < n; k++) {
+            #pragma omp for
+            for (i = 0; i < n; i++) {
+                for (j = 0; j < n; j++) {
+                    if (dist[i][k] + dist[k][j] < dist[i][j]) {
+                        dist[i][j] = dist[i][k] + dist[k][j];
+                    }
                 }
             }
         }
     }
 }
 
-void init(int *dist, int n) {
+int main(int argc, char *argv[]) {
+    int n = atoi(argv[1]);
+    int **dist = (int **) malloc(n * sizeof(int *));
+    for (int i = 0; i < n; i++) {
+        dist[i] = (int *) malloc(n * sizeof(int));
+    }
+
+    // Fill the matrix with random numbers
+    srand(time(NULL));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             if (i == j) {
-                dist[i * n + j] = 0;
+                dist[i][j] = 0;
             } else {
-                dist[i * n + j] = (rand() % 10) + 1;
-                if (dist[i * n + j] > INF) {
-                    dist[i * n + j] = INF;
+                dist[i][j] = (rand() % 10) + 1;
+                if (dist[i][j] > INF) {
+                    dist[i][j] = INF;
                 }
             }
         }
     }
-}
 
-int main() {
-    int dist[N][N];
-    init(&dist[0][0], N);
+    // Time measurement
+    double start = omp_get_wtime();
+    floyd_warshall(dist, n);
+    double end = omp_get_wtime();
+    double cpu_time_used = end - start;
+    printf("Time taken: %f seconds\n", cpu_time_used);
 
-    double start_time = omp_get_wtime();
-    floyd_warshall_openmp(&dist[0][0], N);
-    double end_time = omp_get_wtime();
-    double elapsed_time = end_time - start_time;
-
-    printf("Elapsed time: %f seconds\n", elapsed_time);
+    // Free memory
+    for (int i = 0; i < n; i++) {
+        free(dist[i]);
+    }
+    free(dist);
 
     return 0;
 }
