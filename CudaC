@@ -1,76 +1,74 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-
-#define N 1024
-#define INF 1000000000
-
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#define N 4/* Then number of nodes that changes */
+#define INF 99999
 __global__ void floyd_warshall(int *dist, int k) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < N && j < N) {
-        int ij = dist[i * N + j];
-        int ik = dist[i * N + k];
-        int kj = dist[k * N + j];
-        if (ik + kj < ij) {
-            dist[i * N + j] = ik + kj;
-        }
+        if (dist[i * N + k] + dist[k * N + j] < dist[i * N + j])
+            dist[i * N + j] = dist[i * N + k] + dist[k * N + j];
     }
 }
-
-void init(int *dist, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            if (i == j) {
-                dist[i * n + j] = 0;
-            } else {
-                dist[i * n + j] = (rand() % 10) + 1;
-                if (dist[i * n + j] > INF) {
-                    dist[i * n + j] = INF;
-                }
-            }
-        }
+void printDist(int *dist) {
+    int i, j;
+    printf("    ");
+    for (i = 0; i < N; ++i)
+        printf("%4c", 'A' + i);
+    printf("\n");
+    for (i = 0; i < N; ++i) {
+        printf("%4c", 'A' + i);
+        for (j = 0; j < N; ++j)
+            printf("%4d", dist[i * N + j]);
+        printf("\n");
     }
-}
+    printf("\n");}
+int main(int argc, char *argv[]) {
+    //initialize dist[][]
+    int i, j;
+    int *dist = (int*)malloc(N * N * sizeof(int));
+    for (i = 0; i < N; ++i)
+        for (j = 0; j < N; ++j)
+            if (i == j)
+                dist[i * N + j] = 0;
+            else
+                dist[i * N + j] = rand() % 10 + 1; //number creator 1-10
 
-void floyd_warshall_cuda(int *dist, int n) {
-    int *dist_d;
-    size_t size = n * n * sizeof(int);
-    cudaMalloc(&dist_d, size);
-    cudaMemcpy(dist_d, dist, size, cudaMemcpyHostToDevice);
-
-    dim3 threads_per_block(32, 32);
-    dim3 num_blocks((N + threads_per_block.x - 1) / threads_per_block.x,
-                    (N + threads_per_block.y - 1) / threads_per_block.y);
-
-    for (int k = 0; k < n; k++) {
-        floyd_warshall<<<num_blocks, threads_per_block>>>(dist_d, k);
+    printDist(dist);// printout the new array
+    int *dev_dist;
+    cudaMalloc(&dev_dist, N * N * sizeof(int));
+    cudaMemcpy(dev_dist, dist, N * N * sizeof(int), cudaMemcpyHostToDevice);
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x, (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    for (int k = 0; k < N; ++k) {
+        floyd_warshall<<<numBlocks, threadsPerBlock>>>(dev_dist, k);
+        cudaDeviceSynchronize();
     }
-
-    cudaMemcpy(dist, dist_d, size, cudaMemcpyDeviceToHost);
-    cudaFree(dist_d);
-}
-
-int main() {
-    int dist[N][N];
-    init(&dist[0][0], N);
-
-   float elapsedTime = 0.0f;
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    float elapsedTime = 0.0f;
     cudaError_t cudaEventErr = cudaEventElapsedTime(&elapsedTime, start, stop);
     if (cudaEventErr != cudaSuccess) {
         fprintf(stderr, "Failed to calculate elapsed time: %s\n", cudaGetErrorString(cudaEventErr));
         return -1;}
     elapsedTime *= 1000.0f;
-
-    floyd_warshall_cuda(&dist[0][0], N);
-    
+    cudaMemcpy(dist, dev_dist, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+    printDist(dist);// printout again the new array with shortest paths
+    printf("number of vertices : %d \n", N);
     printf("total time (ms) : %f \n", elapsedTime);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-
+    cudaFree(dev_dist);
+    free(dist);
     return 0;
-}
+    }
+
 
 !sudo apt-get install -y software-properties-common
 !sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
