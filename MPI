@@ -44,3 +44,48 @@ comm.Gather(local_A, D, root=0)
 
 if rank == 0:
     print(D)
+
+
+
+-------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define N 1000
+
+void floyd_warshall(int dist[N][N], int n) {
+    int i, j, k;
+    for (k = 0; k < n; k++) {
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                if (dist[i][k] + dist[k][j] < dist[i][j]) {
+                    dist[i][j] = dist[i][k] + dist[k][j];
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int dist[N][N];
+    int i, j, n = N;
+
+    // Fill the matrix with random numbers
+    srand(time(NULL));
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            dist[i][j] = rand() % 100;
+        }
+    }
+
+    // Time measurement
+    clock_t start = clock();
+    floyd_warshall(dist, n);
+    clock_t end = clock();
+    double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("Time taken: %f seconds\n", cpu_time_used);
+
+    return 0;
+}
