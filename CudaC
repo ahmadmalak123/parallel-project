@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 #define N 1024
 #define INF 1000000000
@@ -38,7 +40,7 @@ void floyd_warshall_cuda(int *dist, int n) {
     cudaMalloc(&dist_d, size);
     cudaMemcpy(dist_d, dist, size, cudaMemcpyHostToDevice);
 
-    dim3 threads_per_block(16, 16);
+    dim3 threads_per_block(32, 32);
     dim3 num_blocks((N + threads_per_block.x - 1) / threads_per_block.x,
                     (N + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -54,7 +56,25 @@ int main() {
     int dist[N][N];
     init(&dist[0][0], N);
 
+    struct timeval start_time, end_time;
+    gettimeofday(&start_time, NULL);
+
     floyd_warshall_cuda(&dist[0][0], N);
+
+    gettimeofday(&end_time, NULL);
+    long long elapsed_time = (end_time.tv_sec - start_time.tv_sec) * 1000000LL + (end_time.tv_usec - start_time.tv_usec);
+    printf("Elapsed time: %lld microseconds\n", elapsed_time);
 
     return 0;
 }
+
+!sudo apt-get install -y software-properties-common
+!sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+!sudo apt-get update
+!sudo apt-get install -y gcc-7 g++-7
+!sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 --slave /usr/bin/g++ g++ /usr/bin/g++-7
+!sudo update-alternatives --config gcc
+
+!apt-get install gcc-7 g++-7
+
+!export CC=/usr/bin/gcc-7 && export CXX=/usr/bin/g++-7
