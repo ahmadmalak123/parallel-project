@@ -13,7 +13,7 @@ static void floyd_warshall(const int num_nodes, int *graph) {
     #pragma omp parallel
     {
         for (int k=0; k<num_nodes; k++) {
-            #pragma omp for collapse(4)
+            #pragma omp for collapse(2)
             for(int src=0; src<num_nodes; src++) {
                 for(int dest=0; dest<num_nodes; dest++) {
                     int other = graph[src*num_nodes+k] + graph[k*num_nodes+dest];
